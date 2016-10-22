@@ -54,6 +54,27 @@ class AccountRepository @Inject()(
         account
       }
   }
+
+  def update(updatedAccount: Account): Either[ValidationError, Account] =
+    db.withTransaction { implicit c =>
+      for {
+        byId <- selectByUUID(updatedAccount.id).as(parser.singleOpt) match {
+          case Some(_) => Right(updatedAccount)
+          case None => Left(ValidationError("id", "Id not found"))
+        }
+        byLogin <- selectAccountByLogin(updatedAccount.login).as(parser.singleOpt) match {
+          case Some(account) if account.id != updatedAccount.id => Left(ValidationError("login", "Login already used"))
+          case None => Right(updatedAccount)
+        }
+        byEmail <- selectAccountByMail(updatedAccount.mail).as(parser.singleOpt) match {
+          case Some(account) if account.id != updatedAccount.id => Left(ValidationError("mail", "Mail already used"))
+          case None => Right(updatedAccount)
+        }
+      } yield {
+        updateAccount(updatedAccount).execute()
+        updatedAccount
+      }
+    }
 }
 
 object AccountRepository {
@@ -102,5 +123,14 @@ object AccountRepository {
        ${account.roles.toArray[String]}
      )
     """
+
+  private def updateAccount(account: Account) = SQL"""
+     UPDATE #$table SET (
+       mail = ${account.mail},
+       login = ${account.login},
+       password = ${account.password},
+       roles = ${account.roles})
+     )
+  """
 
 }
