@@ -13,19 +13,21 @@ class BaseRepository[A](
   val parser: RowParser[A]
 ) {
 
-  // Get an element by its UUID
   def getByUUID(uuid: UUID): Option[A] =
     db.withConnection { implicit c =>
       selectByUUID(uuid).as(parser.singleOpt)
     }
 
-  // Get all the elements
+  def getBy(property: (String, String)): Option[A] =
+  db.withConnection { implicit c =>
+    selectBy(property).as(parser.singleOpt)
+  }
+
   def getAll: Seq[A] =
     db.withConnection { implicit c =>
       selectAll.as(parser*)
     }
 
-  // Remove an element by its UUID
   def removeByUUID(uuid: UUID) =
     db.withConnection { implicit c =>
       deleteByUUID(uuid).execute()
@@ -33,6 +35,10 @@ class BaseRepository[A](
 
   protected def selectByUUID(uuid: UUID) = SQL"""
        SELECT * FROM #$table WHERE #$table.id = $uuid:uuid;
+    """
+
+  protected def selectBy(property: (String, String)) = SQL"""
+       SELECT * FROM #$table WHERE #$table.${property._1} = #$table.${property._2}
     """
 
   protected def selectAll = SQL"""
